@@ -6,6 +6,8 @@ import * as lambda from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as events from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 
 export class Assignment2Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -30,6 +32,8 @@ export class Assignment2Stack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
+    const topic = new sns.Topic(this, 'ImageTopic');
+
     const logImageFn = new lambda.NodejsFunction(this, 'LogImageFunction', {
       entry: 'lambdas/logImage.ts',
       environment: {
@@ -49,7 +53,6 @@ export class Assignment2Stack extends cdk.Stack {
       memorySize: 128,
       timeout: cdk.Duration.seconds(5)
     });
-    
 
     bucket.grantDelete(removeImageFn);
 
@@ -59,8 +62,29 @@ export class Assignment2Stack extends cdk.Stack {
       })
     );
 
+    const addMetadataFn = new lambda.NodejsFunction(this, 'AddMetadataFunction', {
+      entry: 'lambdas/addMetadata.ts',
+      environment: {
+        TABLE_NAME: table.tableName
+      }
+    });
+
+    table.grantWriteData(addMetadataFn);
+
+    topic.addSubscription(new subscriptions.LambdaSubscription(addMetadataFn, {
+      filterPolicy: {
+        metadata_type: sns.SubscriptionFilter.stringFilter({
+          allowlist: ['Caption', 'Date', 'Name']
+        })
+      }
+    }));
+
     new cdk.CfnOutput(this, 'bucketName', {
       value: bucket.bucketName
+    });
+
+    new cdk.CfnOutput(this, 'topicArn', {
+      value: topic.topicArn
     });
   }
 }

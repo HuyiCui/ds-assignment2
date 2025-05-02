@@ -6,7 +6,6 @@ import * as lambda from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as events from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class Assignment2Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -41,13 +40,24 @@ export class Assignment2Stack extends cdk.Stack {
     bucket.grantRead(logImageFn);
     table.grantWriteData(logImageFn);
 
-    const sqsSource = new events.SqsEventSource(queue, {
-      batchSize: 1
-    });
-
-    logImageFn.addEventSource(sqsSource);
+    logImageFn.addEventSource(new events.SqsEventSource(queue, { batchSize: 1 }));
 
     bucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.SqsDestination(queue));
+
+    const removeImageFn = new lambda.NodejsFunction(this, 'RemoveImageFunction', {
+      entry: 'lambdas/removeImage.ts',
+      memorySize: 128,
+      timeout: cdk.Duration.seconds(5)
+    });
+    
+
+    bucket.grantDelete(removeImageFn);
+
+    removeImageFn.addEventSource(
+      new events.SqsEventSource(dlq, {
+        batchSize: 1
+      })
+    );
 
     new cdk.CfnOutput(this, 'bucketName', {
       value: bucket.bucketName

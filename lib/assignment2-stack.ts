@@ -79,6 +79,17 @@ export class Assignment2Stack extends cdk.Stack {
       }
     }));
 
+    const updateStatusFn = new lambda.NodejsFunction(this, 'UpdateStatusFunction', {
+      entry: 'lambdas/updateStatus.ts',
+      environment: {
+        TABLE_NAME: table.tableName
+      }
+    });
+
+    table.grantWriteData(updateStatusFn);
+
+    topic.addSubscription(new subscriptions.LambdaSubscription(updateStatusFn));
+
     new cdk.CfnOutput(this, 'bucketName', {
       value: bucket.bucketName
     });

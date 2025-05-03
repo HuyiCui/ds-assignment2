@@ -78,7 +78,13 @@ export class Assignment2Stack extends cdk.Stack {
       }
     });
     table.grantWriteData(updateStatusFn);
-    topic.addSubscription(new subscriptions.LambdaSubscription(updateStatusFn));
+    topic.addSubscription(new subscriptions.LambdaSubscription(updateStatusFn, {
+      filterPolicy: {
+        status_update: sns.SubscriptionFilter.stringFilter({
+          allowlist: ['true']
+        })
+      }
+    }));    
 
     const mailerFn = new lambda.NodejsFunction(this, 'StatusMailerFunction', {
       entry: 'lambdas/mailer.ts',
